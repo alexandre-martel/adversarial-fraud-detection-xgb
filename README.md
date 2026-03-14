@@ -36,8 +36,7 @@ Arguments :
 | :--- | :--- | :--- |
 | `--data-path` | Path for the data in data/filename.csv | `data/creditcard.csv` |
 | `--seed` | Seed for randomness | `9` |
-| `--learning-rate` | Learning rate of the trainng **XGBoost model only** | `0.05` |
-
-
-
+| `--batch-size` | Batch size of the training  | `512` |
+| `--epochs` | Number of epochs  | `10` |
+| `--lr` | Learning rate of the training  | `1e-3` |
 
