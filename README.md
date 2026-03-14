@@ -1,6 +1,7 @@
-# Adversarial Fraud Detection on MLP
+# Adversarial and Privacy Reinforced Credit Card Fraud Detection on MLP
 
-A credit card fraud detection project using MLP that implements defenses against three issues: adversarial attacks (FGSM), privacy attacks (DG-SDG), and bias mitigation
+A credit card fraud detection project using MLP that implements defenses against three issues: adversarial attacks (FGSM), privacy attacks (DG-SDG), and bias mitigation.
+The datset used for this project is the following : 
 
 ## Explanations and Mathematical Theory
 
