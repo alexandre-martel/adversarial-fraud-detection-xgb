@@ -1,9 +1,18 @@
 import numpy as np
 import pandas as pd
+import torch
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score, average_precision_score, confusion_matrix, classification_report
+
+def set_seed(seed=9):
+    import random, os
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 def load_dataset(csv_path):
 
@@ -58,14 +67,16 @@ def compute_scale_pos_weight(y):
         return 1.0
     return float(neg) / float(pos)
 
-def summarize_classification(y_true, y_pred, y_proba=None, title="Metrics"):
 
-    print("\n=== " + title + " ===")
+def summarize(y_true, y_proba, title="Metrics"):
+    y_pred = (y_proba >= 0.5).astype(int)
     acc = accuracy_score(y_true, y_pred)
-    prec_w, rec_w, f1_w, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted', zero_division=0)
-    prec_m, rec_m, f1_m, _ = precision_recall_fscore_support(y_true, y_pred, average='macro', zero_division=0)
-    
-    
+    prec_w, rec_w, f1_w, _ = precision_recall_fscore_support(y_true, y_pred, average="weighted", zero_division=0)
+    prec_m, rec_m, f1_m, _ = precision_recall_fscore_support(y_true, y_pred, average="macro", zero_division=0)
+    roc = roc_auc_score(y_true, y_proba)
+    pr = average_precision_score(y_true, y_proba)
+
+    print(f"\n=== {title} ===")
     print(f"Accuracy             : {acc}")
     print(f"Precision (weighted) : {prec_w}")
     print(f"Recall (weighted)    : {rec_w}")
@@ -73,15 +84,8 @@ def summarize_classification(y_true, y_pred, y_proba=None, title="Metrics"):
     print(f"Precision (macro)    : {prec_m}")
     print(f"Recall (macro)       : {rec_m}")
     print(f"F1-score (macro)     : {f1_m}")
-
-    if y_proba is not None:
-        roc = roc_auc_score(y_true, y_proba)
-        pr = average_precision_score(y_true, y_proba)  
-        print(f"ROC-AUC              : {roc}")
-        print(f"PR-AUC (pos)         : {pr}")
-
-    print("\nClassification report:")
-    print(classification_report(y_true, y_pred))
-    cm = confusion_matrix(y_true, y_pred)
-    print("Confusion matrix:")
-    print(cm)
+    print(f"ROC-AUC              : {roc}")
+    print(f"PR-AUC (pos)         : {pr}\n")
+    print("Classification report:\n", classification_report(y_true, y_pred, zero_division=0))
+    print("Confusion matrix:\n", confusion_matrix(y_true, y_pred)
+)
