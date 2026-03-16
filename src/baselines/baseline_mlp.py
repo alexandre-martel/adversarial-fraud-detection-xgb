@@ -97,13 +97,13 @@ def main():
     summarize(yt, pt, title="Baseline MLP - Test")
 
 
-    # save model and preprocessing objects for later use in attacks
-    torch.save(model.state_dict(), "mlp_baseline.pt")
-    joblib.dump(scaler, "scaler.joblib")
+    # save model and preprocessing objects 
+    torch.save(model.state_dict(), "baseline_model/mlp_baseline.pt")
+    joblib.dump(scaler, "baseline_model/scaler.joblib")
 
-    np.savez("q_bounds.npz", low=q_low, high=q_high)
-    np.save("X_test.npy", X_te_s)
-    np.save("y_test.npy", y_te)
+    np.savez("baseline_model/q_bounds.npz", low=q_low, high=q_high)
+    np.save("baseline_model/X_test.npy", X_te_s)
+    np.save("baseline_model/y_test.npy", y_te)
 
     print("\nSaved: mlp_baseline.pt, scaler.joblib, q_bounds.npz, X_test.npy, y_test.npy")
 
