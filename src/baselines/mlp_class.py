@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class MLP(nn.Module):
-    def __init__(self, in_dim: int, hidden=(64, 32), p_drop=0.1):
+    def __init__(self, in_dim, hidden=(64, 32), p_drop=0.1):
         super().__init__()
         layers = []
         last = in_dim

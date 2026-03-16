@@ -10,6 +10,7 @@ __pycache__/
 .Python
 data/*
 baseline_model/*
+adversarial_model/*
 build/
 develop-eggs/
 dist/
