@@ -1,11 +1,12 @@
 import argparse
 import os
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from opacus import PrivacyEngine
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, precision_recall_curve
 import matplotlib.pyplot as plt
 import joblib
 
@@ -43,7 +44,7 @@ def plot_privacy_tradeoff(history, save_path):
 
 def main():
     parser = argparse.ArgumentParser(description="Differential Privacy (DP) Training for Fraud Detection")
-    parser.add_argument("--epsilon", type=float, default=8.0, help="Target privacy budget")
+    parser.add_argument("--epsilon", type=float, default=3.0, help="Target privacy budget")
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--data-path", type=str, default="data/creditcard.csv")
     parser.add_argument("--seed", type=int, default=9)
@@ -67,9 +68,9 @@ def main():
                                             torch.tensor(y_tr, dtype=torch.float32)), 
                               batch_size=args.batch_size, shuffle=True)
     
-    test_loader = DataLoader(TensorDataset(torch.tensor(X_te_s, dtype=torch.float32), 
-                                           torch.tensor(y_te, dtype=torch.float32)), batch_size=1024)
-
+    val_loader = DataLoader(TensorDataset(torch.tensor(X_val_s, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32)), batch_size=4096)
+    test_loader = DataLoader(TensorDataset(torch.tensor(X_te_s, dtype=torch.float32), torch.tensor(y_te, dtype=torch.float32)), batch_size=4096)
+    
     # Model Initialization
     model = MLP(in_dim=X_tr_s.shape[1]).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -114,8 +115,8 @@ def main():
         current_eps = privacy_engine.get_epsilon(1e-5)
         
         # Evaluate on Test Set
-        yt, pt = predict_proba(model, test_loader, device)
-        prauc = average_precision_score(yt, pt)
+        yv, pv = predict_proba(model, val_loader, device)
+        prauc = average_precision_score(yv, pv)
         
         history["val_prauc"].append(prauc)
         history["epsilons"].append(current_eps)
@@ -125,9 +126,17 @@ def main():
     # Final Results and Visualization
     plot_privacy_tradeoff(history, model_dir)
     
-    print("\nTraining Complete. Final Evaluation:")
-    summarize(yt, pt, title="Differentially Private Model - Final Results")
-    plot_evaluation_results(yt, pt, save_path=model_dir)
+    # Threshold calibration on validation set for final test evaluation
+    yv, pv = predict_proba(model, val_loader, device)
+    precisions, recalls, thresholds = precision_recall_curve(yv, pv)
+    f1_scores = (2 * precisions * recalls) / (precisions + recalls + 1e-10)
+    best_threshold = thresholds[np.argmax(f1_scores)]
+    print(f"Optimal Threshold: {best_threshold:.6f}")
+    
+    # Final evaluation on test set using the calibrated threshold
+    yt, pt = predict_proba(model, test_loader, device)
+    summarize(yt, pt, threshold=best_threshold, title="Differentially Private Model - Final Results")
+    plot_evaluation_results(yt, pt, threshold=best_threshold, save_path=model_dir)
 
     # Save the DP-trained weights
     torch.save(model.state_dict(), f"{model_dir}/dp_model.pt")

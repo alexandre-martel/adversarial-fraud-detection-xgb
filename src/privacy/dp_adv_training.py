@@ -1,11 +1,12 @@
 import argparse
 import os
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from opacus import PrivacyEngine
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, precision_recall_curve
 import joblib
 
 # Custom project utilities
@@ -54,7 +55,7 @@ def train_one_epoch_dp_adv(model, loader, optimizer, loss_fn, device, eps_adv):
 
 def main():
     parser = argparse.ArgumentParser(description="DP-Adversarial Training (Triple Tension)")
-    parser.add_argument("--epsilon-dp", type=float, default=8.0, help="Target Privacy budget")
+    parser.add_argument("--epsilon-dp", type=float, default=3.0, help="Target Privacy budget")
     parser.add_argument("--epsilon-adv", type=float, default=0.1, help="Adversarial attack strength")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--data-path", type=str, default="data/creditcard.csv")
@@ -76,6 +77,9 @@ def main():
     train_loader = DataLoader(TensorDataset(torch.tensor(X_tr_s, dtype=torch.float32), 
                                             torch.tensor(y_tr, dtype=torch.float32)), 
                               batch_size=args.batch_size, shuffle=True)
+    
+    val_loader = DataLoader(TensorDataset(torch.tensor(X_val_s, dtype=torch.float32), 
+                                          torch.tensor(y_val, dtype=torch.float32)), batch_size=4096)
     
     test_loader = DataLoader(TensorDataset(torch.tensor(X_te_s, dtype=torch.float32), 
                                            torch.tensor(y_te, dtype=torch.float32)), batch_size=1024)
@@ -107,15 +111,25 @@ def main():
     for epoch in range(1, args.epochs + 1):
         train_one_epoch_dp_adv(model, train_loader, optimizer, loss_fn, device, args.epsilon_adv)
         
+        yv, pv = predict_proba(model, val_loader, device)
+        prauc = average_precision_score(yv, pv)
+        
         current_eps = privacy_engine.get_epsilon(1e-5)
-        yt, pt = predict_proba(model, test_loader, device)
-        prauc = average_precision_score(yt, pt)
         
         print(f"Epoch {epoch:02d} | Test PR-AUC: {prauc:.4f} | Spent epsilon_dp: {current_eps:.2f}")
 
+
+    # Threshold Calibration
+    yv, pv = predict_proba(model, val_loader, device)
+    prec, rec, threshs = precision_recall_curve(yv, pv)
+    f1s = (2 * prec * rec) / (prec + rec + 1e-10)
+    best_threshold = threshs[np.argmax(f1s)]
+    print(f"Optimal Threshold: {best_threshold:.6f}")
+    
     # Final Evaluation
-    summarize(yt, pt, title="DP-Adversarial Model - Final Results")
-    plot_evaluation_results(yt, pt, save_path=model_dir)
+    yt, pt = predict_proba(model, test_loader, device)
+    summarize(yt, pt, threshold=best_threshold, title="DP-Adversarial Model - Final Results")
+    plot_evaluation_results(yt, pt, threshold=best_threshold, save_path=model_dir)
     torch.save(model.state_dict(), f"{model_dir}/dp_adv_model.pt")
     scaler_path = os.path.join(model_dir, "scaler.joblib")
     joblib.dump(scaler, scaler_path)

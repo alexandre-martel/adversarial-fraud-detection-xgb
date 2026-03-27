@@ -45,6 +45,7 @@ def main():
     parser.add_argument("--model-path", type=str, required=True, help="Path to the .pt model weights")
     parser.add_argument("--scaler-path", type=str, required=True, help="Path to the .joblib scaler")
     parser.add_argument("--data-path", type=str, default="data/creditcard.csv")
+    parser.add_argument("--threshold", type=float, default=0.5, help="Classification threshold for predictions")
     parser.add_argument("--seed", type=int, default=9)
     args = parser.parse_args()
 
@@ -79,7 +80,7 @@ def main():
     )
     
     y_true, y_probs = predict_proba(model, test_loader, device)
-    y_pred = (y_probs > 0.5).astype(int)
+    y_pred = (y_probs > args.threshold).astype(int)
 
     fair_metrics = calculate_fairness_metrics(y_true, y_pred, sensitive_test)
     print(f"\nFairness Metrics for {args.name}:")

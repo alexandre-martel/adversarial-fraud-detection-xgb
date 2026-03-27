@@ -81,8 +81,8 @@ def recall_pos(y, yhat):
     return 0.0 if (tp + fn) == 0 else tp / (tp + fn)
 
 
-def summarize(y_true, y_proba, title="Metrics"):
-    y_pred = (y_proba >= 0.5).astype(int)
+def summarize(y_true, y_proba, threshold=0.5, title="Metrics"):
+    y_pred = (y_proba >= threshold).astype(int)
     acc = accuracy_score(y_true, y_pred)
     prec_w, rec_w, f1_w, _ = precision_recall_fscore_support(y_true, y_pred, average="weighted", zero_division=0)
     prec_m, rec_m, f1_m, _ = precision_recall_fscore_support(y_true, y_pred, average="macro", zero_division=0)
@@ -121,9 +121,9 @@ def plot_training_history(history, save_path):
     plt.savefig(os.path.join(save_path, "learning_curves.png"))
     plt.close()
 
-def plot_evaluation_results(y_true, y_proba, save_path):
+def plot_evaluation_results(y_true, y_proba, threshold=0.5, save_path=None):
     # Confusion Matrix Heatmap
-    y_pred = (y_proba >= 0.5).astype(int)
+    y_pred = (y_proba >= threshold).astype(int)
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)

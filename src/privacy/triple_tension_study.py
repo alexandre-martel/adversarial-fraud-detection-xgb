@@ -15,9 +15,10 @@ from src.utils import set_seed, load_dataset, get_datasets, standardize
 from src.baselines.mlp_class import MLP
 from src.baselines.baseline_mlp import predict_proba
 
-def train_one_pair(eps_dp, eps_adv, data_bundle, args, device):
+def train_one_pair(eps_dp, eps_adv, data_bundle, args, device, bounds):
     """Trains a DP-Adversarial model for a specific pair of (epsilon_dp, epsilon_adv) and returns the test PR-AUC."""
     X_tr, y_tr, X_te, y_te = data_bundle
+    low, high = bounds
     
     model = MLP(in_dim=30).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -49,6 +50,7 @@ def train_one_pair(eps_dp, eps_adv, data_bundle, args, device):
             loss_tmp.backward()
             
             adv_xb = (xb + eps_adv * xb.grad.data.sign()).detach()
+            adv_xb = torch.max(torch.min(adv_xb, high), low) # Respecting bounds
             
             optimizer.zero_grad()
             out_adv = model(adv_xb)
@@ -75,8 +77,13 @@ def main():
 
     X, y, _ = load_dataset("data/creditcard.csv")
     X_tr, y_tr, X_val, y_val, X_te, y_te = get_datasets(X, y)
-    X_tr_s, _, X_te_s, _, _, _ = standardize(X_tr, X_val, X_te)
+    X_tr_s, X_val_s, X_te_s, scaler, q_low, q_high = standardize(X_tr, X_val, X_te)
     data_bundle = (X_tr_s, y_tr, X_te_s, y_te)
+    
+    bounds = (
+        torch.tensor(q_low, device=device).float(),
+        torch.tensor(q_high, device=device).float()
+    )
 
     dp_list = [2.0, 4.0, 8.0, 16.0, 64.0]  
     adv_list = [0.0, 0.05, 0.1, 0.15, 0.5]      
@@ -87,7 +94,7 @@ def main():
         row = []
         for eps_adv in adv_list:
             print(f"Attack with Epsilon_dp={eps_dp} | Epsilon_adv={eps_adv}")
-            score = train_one_pair(eps_dp, eps_adv, data_bundle, args, device)
+            score = train_one_pair(eps_dp, eps_adv, data_bundle, args, device, bounds)
             row.append(score)
         results.append(row)
 

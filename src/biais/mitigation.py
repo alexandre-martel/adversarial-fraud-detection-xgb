@@ -20,7 +20,7 @@ from src.baselines.mlp_class import MLP
 from src.baselines.baseline_mlp import predict_proba
 from src.adversarial.fsgm_attack import fgsm_attack_batch
 
-def get_fairness_weights(df_train):
+def get_fairness_weights(df_train, alpha=10):
     """
     Calculates weights for the 4 intersections of Group and Class.
     Formula: W = N_total / (4 * N_subgroup)
@@ -38,22 +38,6 @@ def get_fairness_weights(df_train):
     # Map the calculated weights to every row in the training set
     return df_train.apply(lambda x: weights_map[(x['sensitive_group'], x['Class'])], axis=1).values
 
-def calculate_audit(y_true, y_pred, sensitive_attr):
-    """Calculates DI, SPD, and EOD for the final report."""
-    stats = {}
-    for g in [0, 1]:
-        idx = (sensitive_attr == g)
-        yt_g, yp_g = y_true[idx], y_pred[idx]
-        tn, fp, fn, tp = confusion_matrix(yt_g, yp_g, labels=[0, 1]).ravel()
-        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
-        sr = (tp + fp) / len(yt_g)
-        stats[g] = {'tpr': tpr, 'sr': sr}
-    
-    return {
-        'SPD': stats[0]['sr'] - stats[1]['sr'],
-        'EOD': stats[0]['tpr'] - stats[1]['tpr'],
-        'DI':  stats[1]['sr'] / stats[0]['sr'] if stats[0]['sr'] > 0 else 1.0
-    }
     
 def main():
     model_folder = "results/mitigated_model"
@@ -61,10 +45,11 @@ def main():
 
     parser = argparse.ArgumentParser(description="Mitigated Training: DP + Adv + Fairness")
     parser.add_argument("--data-path", type=str, default="data/creditcard.csv")
-    parser.add_argument("--epsilon-dp", type=float, default=8.0)
+    parser.add_argument("--epsilon-dp", type=float, default=3.0)
     parser.add_argument("--epsilon-adv", type=float, default=0.1)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--max-grad-norm", type=float, default=1.0) 
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
@@ -126,7 +111,7 @@ def main():
         target_epsilon=args.epsilon_dp, 
         target_delta=1e-5, 
         epochs=args.epochs, 
-        max_grad_norm=1.0
+        max_grad_norm=args.max_grad_norm
     )
     
     history = {"train_loss": [], "val_prauc": []}
@@ -184,17 +169,10 @@ def main():
     
     # Final evaluation on test set using the calibrated threshold
     yt, pt = predict_proba(model, test_loader, device)
-    y_pred = (pt >= best_threshold).astype(int)
-    
-    metrics = calculate_audit(yt, y_pred, sensitive_test)
-    print(f"DI: {metrics['DI']:.4f} | SPD: {metrics['SPD']:.4f} | EOD: {metrics['EOD']:.4f}")
-    print("-" * 40)
-    
-    
-    summarize(yt, pt, title="Mitigated Model (DP+Adv+Fairness) - Test Set")
-    plot_evaluation_results(yt, pt, save_path=model_folder)
+ 
+    summarize(yt, pt, threshold=best_threshold, title="Mitigated Model (DP+Adv+Fairness) - Test Set")
+    plot_evaluation_results(yt, pt, threshold=best_threshold, save_path=model_folder)
 
-    # Save same objects as adversarial_training.py
     torch.save(model.state_dict(), f"{model_folder}/mitigated_mlp.pt")
     joblib.dump(scaler, f"{model_folder}/scaler.joblib")
 
