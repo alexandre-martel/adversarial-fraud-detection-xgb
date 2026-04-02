@@ -1,7 +1,6 @@
 # Adversarial and Privacy Reinforced Credit Card Fraud Detection on MLP
 
 A credit card fraud detection project using MLP that implements defenses against three issues: adversarial attacks (FGSM), privacy attacks (DG-SDG), and bias mitigation.
-The datset used for this project is the following : 
 
 ## Explanations and Mathematical Theory
 
@@ -19,6 +18,11 @@ The datset used for this project is the following :
 
 
 ### Bias & Mitigation 
+
+## Dataset 
+
+We will use the Credit Card Fraud Detection dataset from Kaggle, which contains transactions made by European cardholders in September 2013. The datset is the following : https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
+The dataset consists primarily of numerical features derived from a Principal Component Analysis (PCA) transformation. Due to confidentiality constraints, the original features and specific domain background are unavailable. Consequently, features V1 through V28 represent the principal components, while 'Time' and 'Amount' are the only variables retained in their original, non-transformed state.
 
 ## Download and Run
 
